@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using nobnak.Algebra;
 
 namespace nobnak.Geometry  {
 	
@@ -25,7 +26,54 @@ namespace nobnak.Geometry  {
 			if (face == null)
 				throw new System.ArgumentException("Face not found");
 			
-			SplitTriangle(face, p);
+			foreach (var he in SplitTriangle(face, p))
+				_flipCheck.Push(he);
+			while (_flipCheck.Count > 0) {
+				var he = _flipCheck.Pop();
+				if (he.opposite == null)
+					continue;
+				
+				var v0 = vertices[he.vertex.index];
+				var v1 = vertices[he.next.vertex.index];
+				var v2 = vertices[he.next.next.vertex.index];
+				var v3 = vertices[he.opposite.next.next.vertex.index];
+				var det = Determinant.Det(new float[] {
+					1f, v0.x, v0.y, v0.sqrMagnitude,
+					1f, v1.x, v1.y, v1.sqrMagnitude,
+					1f, v2.x, v2.y, v2.sqrMagnitude,
+					1f, v3.x, v3.y, v3.sqrMagnitude }, 4);
+				if (det > 0) {
+					FlipEdge(he);
+				}
+			}
+		}
+		
+		public void FlipEdge(HalfEdge he) {
+			var f0 = he.face;
+			var f1 = he.opposite.face;
+			var he0a = he.next;
+			var he0b = he0a.next;
+			var he1 = he.opposite;
+			var he1a = he1.next;
+			var he1b = he1a.next;
+			
+			he.vertex = he1b.vertex;
+			he1.vertex = he0b.vertex;
+
+			f0.halfedge = he0b;
+			he.face = he0b.face = he1a.face = f0;
+			f1.halfedge = he1b;
+			he1.face = he1b.face = he0a.face = f1;
+
+			he0b.next = he1a;
+			he1a.next = he;
+			he.next = he0b;
+			he1.next = he1b;
+			he1b.next = he0a;
+			he0a.next = he1;
+			
+			_flipCheck.Push(he1a);
+			_flipCheck.Push(he1b);
 		}
 		
 		public HalfEdge[] SplitTriangle(HalfEdge.Face f, Vector2 p) {
